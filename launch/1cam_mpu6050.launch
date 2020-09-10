@@ -1,0 +1,40 @@
+<launch>
+
+    <arg name="directory" default="/home/larrkchlaptop/logger_data/"/>
+
+    <arg name="binning_on" default="false"/>
+    <arg name="triggered_on" default="false"/>
+    <arg name="auto_exposure_control" default="false"/>
+    <arg name="auto_gain_control" default="false"/>
+    <arg name="expose_us" default="10000"/>
+    <arg name="frame_rate" default="20.0"/>
+
+    <arg name="n_cameras" default="0"/>
+    <arg name="n_lidars" default="0"/>
+   
+    <node pkg="improved_topic_logger" name="improved_topic_logger" type="improved_topic_logger" output="screen">
+        <param name="n_cameras" type="int" value="$(arg n_cameras)"/>
+        <param name="n_lidars" type="int" value="$(arg n_lidars)"/>
+        <param name="directory" type="string" value="$(arg directory)"/>
+    </node>
+    <node pkg="bluefox" name="bluefox_multiple_node" type="bluefox_multiple_node" output="screen">
+        <param name="binning_on" type="bool" value="$(arg binning_on)"/>
+        <param name="triggered_on" type="bool" value="$(arg triggered_on)"/>
+        <param name="aec_on" type="bool" value="$(arg auto_exposure_control)"/>
+        <param name="agc_on" type="bool" value="$(arg auto_gain_control)"/>
+	<param name="expose_us" type="int" value="$(arg expose_us)"/>
+        <param name="frame_rate" type="double" value="$(arg frame_rate)"/>
+    </node>
+    <node pkg="rosserial_python" type="serial_node.py" name="arduino_UART" args="_port:=/dev/ttyUSB0 _baud:=115200" output="screen">
+    </node>
+
+<!--
+<group ns = "lidar0">
+<include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
+  <arg name="device_ip" value="192.168.1.101" />
+  <arg name="port" value="2367" />
+</include>
+</group> -->
+
+	   
+</launch>
