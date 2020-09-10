@@ -21,6 +21,21 @@
 //     PORTD &= ~(B7 | B5 | B4); // digital pin 7 5 4 LOW
 //     PORTD ^= B7 | B5 | B4; // digital pin 7 5 4 toggle
 
+#include <ros.h>
+#include <std_msgs/String.h>
+#include <camlidar_module/trg_msg.h> // custom message
+
+// node handler
+ros::NodeHandle nh;
+camlidar_module::trg_msg trgmsg;
+ros::Publisher pub_msg("/mcu/trigger", &trgmsg);
+
+volatile unsigned long trigger_time = 0;
+volatile unsigned long cam_counter = 0;
+volatile unsigned long pps_counter = 0;
+volatile unsigned long time_sec = 0;
+volatile unsigned long time_nsec = 0;
+
 void setup(){
   // pin setting
   
@@ -48,6 +63,13 @@ void setup(){
   //enable timer compare interrupt
   TIMSK1 |= (1 << OCIE1A); 
   sei(); // allow interrupt
+
+
+  // ROS initialization
+  nh.getHardware()->setBaud(115200);
+
+  nh.initNode();
+  nh.advertise(pub_msg);
 }
 
 ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles 
@@ -61,11 +83,28 @@ ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles
     if(ticker > 332) { // 0.3 ms width high!
       PORTD &= ~B7;
       ticker = 0;
+
+      // fill ros msg
+      trgmsg.status_trgs = 1;
+      trgmsg.seq_cam = ++cam_counter;
+      // log time
+      trigger_time = micros();
+            
       if(cnt_trg > 29){
         PORTB &= ~B2;
+        trgmsg.status_trgs = 2;
+        trgmsg.seq_pps = ++pps_counter;
         cnt_trg = 0;
       }
       ++cnt_trg;
+
+      // send msg
+      time_sec = trigger_time/1000000;
+      time_nsec = trigger_time - time_sec*1000000;
+      trgmsg.stamp.sec  = time_sec;
+      trgmsg.stamp.nsec = time_nsec;
+      pub_msg.publish(&trgmsg);
+      nh.spinOnce();
     }
   }
 }
@@ -74,4 +113,5 @@ ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles
 void loop(){
   
 }
+
 
