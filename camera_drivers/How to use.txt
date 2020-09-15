@@ -1,0 +1,66 @@
+E.	Velodyne LiDAR ROS library 설치
+
+ velodyne lidar의 데이터를 ROS topic으로 출력하는 rospackage를 설치해야한다. 아래 주소에서 설치 방법이 상세하게 설명되어있다.
+(http://wiki.ros.org/velodyne/Tutorials/Getting%20Started%20with%20the%20Velodyne%20VLP16)
+ 설치 후, 실행이 되는지 확인해보자. 단, 본 lidar+camera 하드웨어 세팅에서는 lidar 의 IP를 static IP로 설정해주었기 때문에, roscd velodyne_pointcloud 에서 /launch 폴더 내 VLP16_points.launch 파일을 수정해야 사용 할 수 있다. 
+ 연구실 내 각 LiDAR에는 고정 IP와 port 번호를 부여 해두었다.
+
+  	lidar0: 192.168.1.101 (port 2357)
+ 	lidar1: 192.168.1.201 (port 2358)
+ 
+ 위 IP와 port 번호를 참고하여 launch 파일을 수정해주자.
+
+ <arg name=”device_ip” default=”” />  <arg name=”device_ip” default=”192.168.1.xxx” />
+ <arg name=”port” default=”” />  <arg name=”port” default=”2357” />
+
+ 이후, 아래 명령을 실행하여 rviz를 통해 pointcloud2 토픽이 잘 나오는지 확인해본다.
+
+>> roslaunch velodyne_pointcloud VLP16_points.launch
+
+F.	Matrix Vision mvGenTL library 설치
+
+ 본 센서 하드웨어의 camera는 독일 matrixvision (baluff) 사의 mvBlueCOUGAR-X-104i 제품을 사용한다 (grayscale). 해당 제품은 산업용 이미지솔루션의 통신 표준으로 자리잡은 GigE (이미지 전송용 LAN 통신 protocol) 을 이용하며, 사용하기 위해서는 독립적인 library를 설치해주어야 한다.
+ 본 문서와 같은 폴더의 ‘tools’ 폴더의 ‘matrixvision.zip’ 압축을 풀고, 압축이 풀린 경로로 가서 라이브러리 설치를 위해 아래 명령을 순차적으로 실행한다.
+ 
+>> sudo chmod +x install_mvGenTL_Acquire.sh 
+>> sudo ./install_mvGenTL_Acquire.sh 
+
+ 설치 시, 모두 yes를 입력하여 설치를 완료한다. 조금 걸린다. 
+ 설치 완료 후, 재부팅을 해준다. 재부팅 시에 library가 설치되어있는 경로에 대한 환경변수가 설정 되는 것으로 보인다.
+ ** blueFOX-MLC 카메라의 경우, GenTL을 쓰지않고 hardware specified library를 쓴다. 따라서bluefox 카메라 사용할 때에는 전용 드라이버도 함께 설치해주자. 설치 방법은 거의 동일하다!
+
+G.	libusb 접근 권한 부여 (for blueFOX camera only)
+
+ blueFOX 카메라는 /dev/usb 쪽에 읽기+쓰기 모두 접근하는데, linux 기본 세팅은 모든 유저에게 접근 권한이 주어져있지 않다. 따라서, 모든 유저가 dev 쪽을 건드릴 수 있도록 접근 권한을 줘야한다.
+
+vectornav 사 vn-100t 사용 시 간혹 /imu: VN: Permission denied 가 뜰 수 있다. 이는 vn-100t 가 ttyUSB0 을 사용하는데 ttyUSB0은 root 와 dialout Group에만 읽기/쓰기 권한이 주어져서 이다. 현재 Linux user의 권한이 dialout Group 안에 들어가있는지 확인하기 
+
+command 에서
+>>id
+dialout 이라는 글자가 안보이면 그 그룹에 안들어가있는것.
+>> sudo usermod -a -G dialout <username> 
+으로 권한을 주고, 꼭 REBOOT을 해야지 권한이 주어진다.
+H.	Aruduino ROS 설치
+
+ tools에 있는 arduino_1.8.3 폴더를 Documents 등 편한 경로에 압축을 푼다. 아두이노 IDE에서 ROS 를 지원하도록 설치해준다. 
+
+<MKR ZERO board manager 설치>
+ 사용하는 arduino는 MKR zero 이다. Arduino IDE를 켜고, <Tools>-<board>-<board manager…>에서 mkrzero 를 검색하고, ‘Arduino SAMD Boards (32-bits ARM Cortex-M0+) by Arduino’ 를 최신 버전으로 설치한다.
+ 
+<Ethernet library update>
+ 우선, ethernet shield를 사용하는데, 아두이노 IDE를 켜고, <Sketch>-<Include Library>-<Manage Libraries…> 메뉴를 선택한다. Ethernet을 검색하면, 두번째인가? ‘Ethernet Bult-In by Various (see AUTHORS file for details)’ 를 설치한다. 무조건 최신버전! 아마도 2.0.0 일것이다.
+
+<CAN library download>
+ can 통신을 위해, (sketch->include library… -> Manage Libraries… -> mcp2515 검색-> CAN 이라는    library 다운로드! (최신버전으로) by Sandeep mistry 껄로.
+
+<Arduino ROS 를 위한 ros_lib 생성하기 (custom message 포함)>
+ 우선, ros_lib 만드는 방법을 알아보자.
+>> sudo apt-get install ros-{YOURDISTRO}-rosserial-arduino
+>> sudo apt-get install ros-{YOURDISTRO}-rosserial
+
+ 위 두 줄을 설치해준다. 아두이노 IDE가 있는 폴더 (나의 경우, Downloads/arduino1.8.3 이었다.)에서 다음과 같은 짓을 해준다.
+>> cd <arduino IDE path>/libraries
+>> rm –rf ros_lib % 기존에 있던 ros_lib 폴더를 지워준다.
+>> rosrun rosserial_arduino make_libraries.py . % 끝에 쩜 꼭 찍어줘야한다!!
+ 이렇게 하면 된다.
+ 만약, custom message를 이용하고 싶으면, 각각 프로젝트에서 필요한 custom message를 정의하고, 위에 적힌 것 처럼 ros_lib 폴더 삭제 후 재생성을 해주면 ros_lib에 해당 custom message가 생성된다.
