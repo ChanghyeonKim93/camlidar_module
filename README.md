@@ -1,5 +1,7 @@
 # Camera and LiDAR module (triggered)
 ## How to install?
+* First, download 'bluefox_ros' repository
+
 * camera driver
  센서 하드웨어의 camera는 독일 matrixvision (baluff) 사의 mvBlueCOUGAR-X-104i 제품을 사용한다 (grayscale). 해당 제품은 산업용 이미지솔루션의 통신 표준으로 자리잡은 GigE (이미지 전송용 LAN 통신 protocol) 을 이용하며, 사용하기 위해서는 독립적인 library를 설치해주어야 한다.
  본 문서와 같은 폴더의 ‘tools’ 폴더의 ‘matrixvision.zip’ 압축을 풀고, 압축이 풀린 경로로 가서 라이브러리 설치를 위해 아래 명령을 순차적으로 실행한다.
