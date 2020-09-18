@@ -35,7 +35,7 @@ generate_messages(
 
 catkin_package(
 	DEPENDS Eigen
-  CATKIN_DEPENDS message_runtime roscpp
+  CATKIN_DEPENDS message_runtime roscpp message_filters
 )
 
 

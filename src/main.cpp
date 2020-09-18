@@ -26,8 +26,7 @@ const std::string currentDateTime(){
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "camlidar_module");
-    ros::NodeHandle nh("~");
-
+ros::NodeHandle nh("~");
     CamLidarSyncAlign* cl = new CamLidarSyncAlign(nh);
     
     while(ros::ok()){

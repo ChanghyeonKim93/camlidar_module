@@ -33,10 +33,10 @@
 
 // topic synchronizer
 #include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
-
+#include <message_filters/sync_policies/exact_time.h>
 
 using namespace std;
 inline string dtos(double x) {
@@ -57,16 +57,15 @@ public:
     ~CamLidarSyncAlign();
 
 // private variables
-private:
+
     // node handler
     ros::NodeHandle nh_;
 
      // subscribers
-    image_transport::ImageTransport it_;
-
     message_filters::Subscriber<sensor_msgs::Image> *img_sub;
     message_filters::Subscriber<sensor_msgs::PointCloud2> *lidar_sub;
-    message_filters::Synchronizer<MySyncPolicy> *sync_sub;
+//typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> *sync_sub;
 
     // topic names
     string topicname_img_;
@@ -86,7 +85,7 @@ private:
     int n_pts_lidar;
 
 // private methods
-private:
+public:
     void callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar);
 
 };
@@ -94,7 +93,7 @@ private:
 
 /* implementation */
 CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
-: nh_(nh), it_(nh_)
+: nh_(nh)
 {   
     cout << " ALGINER STARTS.\n";
 
@@ -113,11 +112,13 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
 
     topicname_lidar_ = "/lidar0/velodyne_points";
 
+    this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 10);
+    this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 10);
+    
     // Generate topic synchronizer
-	this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 10);
-	this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 10);
-	this->sync_sub = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(1000), *this->img_sub, *this->lidar_sub);
+    this->sync_sub = new message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2>(*this->img_sub, *this->lidar_sub,1000);
     this->sync_sub->registerCallback(boost::bind(&CamLidarSyncAlign::callbackImageLidarSync,this, _1, _2));
+
 };
 CamLidarSyncAlign::~CamLidarSyncAlign(){
     delete[] buf_lidar_x;

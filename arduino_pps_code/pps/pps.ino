@@ -190,7 +190,11 @@ ISR(TIMER1_COMPA_vect){// 50 ms
       hhmmss_msmsms_c[9] = c[2];
     }
     
-    
+      trgmsg.stamp.sec  = time_sec;
+    trgmsg.stamp.nsec = time_nsec;
+    pub_msg.publish(&trgmsg);
+    nh.spinOnce(); // ROS message transmission
+
     // NMEA message (GPRMC)  
     volatile char buf[41+1];
     strcpy(buf,header_c);
@@ -214,13 +218,14 @@ ISR(TIMER1_COMPA_vect){// 50 ms
     // fill ros msg
     trgmsg.status_trgs = 1;
     trgmsg.seq_cam = ++cam_counter;
-  }
+    
   
-  trgmsg.stamp.sec  = time_sec;
-  trgmsg.stamp.nsec = time_nsec;
-  pub_msg.publish(&trgmsg);
-  nh.spinOnce(); // ROS message transmission
+    trgmsg.stamp.sec  = time_sec;
+    trgmsg.stamp.nsec = time_nsec;
+    pub_msg.publish(&trgmsg);
+    nh.spinOnce(); // ROS message transmission
 
+  }
     
   ++unit_time_counter;
 }
