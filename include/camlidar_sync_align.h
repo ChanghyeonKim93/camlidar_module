@@ -116,7 +116,7 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
     // Generate topic synchronizer
 	this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 10);
 	this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 10);
-	this->sync_sub = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(30), *this->img_sub, *this->lidar_sub);
+	this->sync_sub = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(1000), *this->img_sub, *this->lidar_sub);
     this->sync_sub->registerCallback(boost::bind(&CamLidarSyncAlign::callbackImageLidarSync,this, _1, _2));
 };
 CamLidarSyncAlign::~CamLidarSyncAlign(){
@@ -129,9 +129,10 @@ CamLidarSyncAlign::~CamLidarSyncAlign(){
 };
 void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar){
     // get image
+    cout << " camlidar node callback.\n";
     cv_bridge::CvImagePtr cv_ptr;
-	cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
-	buf_img_ = cv_ptr->image;
+    cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
+    buf_img_ = cv_ptr->image;
 
 	double time_img = (double)(msg_image->header.stamp.sec * 1e6 + msg_image->header.stamp.nsec / 1000) / 1000000.0;
     cout << "Callback time (image): " << time_img << "\n";

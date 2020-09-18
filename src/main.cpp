@@ -32,8 +32,8 @@ int main(int argc, char **argv) {
     
     while(ros::ok()){
         ros::spinOnce();
-	}
+    }
 
-	ROS_INFO_STREAM("End of the program.\n");
-	return -1;
+    ROS_INFO_STREAM("End of the program.\n");
+    return -1;
 }
