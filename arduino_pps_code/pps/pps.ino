@@ -105,7 +105,7 @@ ISR(TIMER1_COMPA_vect){// 50 ms
   
   // log time
   //trigger_time = micros();
-  trigger_time = unit_time_counter*50000;
+  trigger_time = unit_time_counter*49998; // 1.925 us / 50 ms fast 
   
   // send msg
   time_sec  = trigger_time/1000000;
