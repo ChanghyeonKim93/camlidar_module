@@ -33,12 +33,10 @@ generate_messages(
   std_msgs
 )
 
-
 catkin_package(
 	DEPENDS Eigen
   CATKIN_DEPENDS message_runtime roscpp
 )
-
 
 
 set(includeDirs ${includeDirs} ${CMAKE_CURRENT_BINARY_DIR})

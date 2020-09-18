@@ -1,0 +1,12 @@
+<launch>
+<group ns = "lidar0">
+<include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
+  <arg name="device_ip" value="192.168.1.101" />
+  <arg name="port" value="2367" />
+  <arg name="rpm" value="1200" />
+  <arg name="gps_time" value="true" />
+</include>
+</group>
+
+	   
+</launch>
