@@ -34,17 +34,7 @@
 #include "improved_topic_logger/imu_serial.h" // dedicated msgs for imu mpu6050
 
 using namespace std;
-inline string dtos(double x) {
-	stringstream s;
-	s << setprecision(6) << fixed << x;
-	return s.str();
-};
 
-inline string itos(double x) {
-	stringstream s;
-	s << x;
-	return s.str();
-};
 
 class ImprovedTopicLogger{
 public:
