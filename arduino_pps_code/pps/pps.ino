@@ -33,6 +33,7 @@ ros::Publisher pub_msg("/mcu/trigger", &trgmsg);
 
 volatile unsigned long trigger_time = 0;
 volatile unsigned long count = 0;
+volatile unsigned long unit_time_counter = 0; 
 
 volatile unsigned long cam_counter = 0;
 volatile unsigned long pps_counter = 0;
@@ -49,8 +50,9 @@ volatile unsigned long time_msmsms = 0;
     
 volatile char header_c[6+1] = "GPRMC,";
 volatile char hhmmss_msmsms_c[10+1] = "000000.000";
-volatile char tail_c[52+1]  = ",A,0,N,0,E,,,230394,003.1,W";
-    
+volatile char tail_c[25+1]  = ",A,2,N,1,E,,,230394,0,W,A";
+//    volatile char tail_c[53+1]  = ",A,4804.000,N,4436.001,E,022.4,084.4,230394,003.1,W,A";
+
 byte stringChecksum(volatile char* s, int len)
 {
   byte c = 0;
@@ -73,7 +75,7 @@ void setup(){
   TCCR1B = 0; // same for B
   TCNT1 = 0;
 
-  OCR1A = 12521-1; // 12500 * 4 us/cnt = 200000 us per compare!// MEGA 12521 -1 : 
+  OCR1A = 12522-1; // 12500 * 4 us/cnt = 200000 us per compare!// MEGA 12521 -1 : 
   
   // turn on CTC mode
   TCCR1B |= (1 << WGM12); // CTC mode.
@@ -92,17 +94,18 @@ void setup(){
   sei(); // allow interrupt
 
   // ROS initialization
-  nh.getHardware()->setBaud(230400);
+  nh.getHardware()->setBaud(460800);
 
   nh.initNode();
   nh.advertise(pub_msg);
 }
 
-ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles 
+ISR(TIMER1_COMPA_vect){// 50 ms
   ++count;
   
   // log time
-  trigger_time = micros();
+  //trigger_time = micros();
+  trigger_time = unit_time_counter*50000;
   
   // send msg
   time_sec  = trigger_time/1000000;
@@ -189,12 +192,12 @@ ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles
     
     
     // NMEA message (GPRMC)  
-    volatile char buf[68+1];
+    volatile char buf[41+1];
     strcpy(buf,header_c);
     strcat(buf,hhmmss_msmsms_c);
     strcat(buf,tail_c);
 
-    byte c = stringChecksum((volatile char*)buf,68);
+    byte c = stringChecksum((volatile char*)buf,41);
     Serial3.print("$");
     Serial3.print((const char*)buf);
     Serial3.print("*");
@@ -217,6 +220,9 @@ ISR(TIMER1_COMPA_vect){//timer 1 interrupt 1 Hz toggles
   trgmsg.stamp.nsec = time_nsec;
   pub_msg.publish(&trgmsg);
   nh.spinOnce(); // ROS message transmission
+
+    
+  ++unit_time_counter;
 }
 
 
