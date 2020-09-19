@@ -118,11 +118,11 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
 
     topicname_lidar_ = "/lidar0/velodyne_points";
 
-    sub1 = nh_.subscribe("/0/image_raw",10,&CamLidarSyncAlign::imgcb,this);
-    sub2 = nh_.subscribe("/lidar0/velodyne_points",10,&CamLidarSyncAlign::lidarcb,this);
+    //sub1 = nh_.subscribe("/0/image_raw",1,&CamLidarSyncAlign::imgcb,this);
+    //sub2 = nh_.subscribe("/lidar0/velodyne_points",1,&CamLidarSyncAlign::lidarcb,this);
 
-    this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 10);
-    this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 10);
+    this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 1);
+    this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 1);
     
     // Generate topic synchronizer
     this->sync_sub = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10),*this->img_sub, *this->lidar_sub);
@@ -139,7 +139,7 @@ CamLidarSyncAlign::~CamLidarSyncAlign(){
 };
 void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar){
     // get image
-    cout << " camlidar node callback.\n";
+    //cout << " camlidar node callback.\n";
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
     buf_img_ = cv_ptr->image;

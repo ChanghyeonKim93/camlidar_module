@@ -29,9 +29,7 @@ int main(int argc, char **argv) {
 ros::NodeHandle nh("~");
     CamLidarSyncAlign* cl = new CamLidarSyncAlign(nh);
     
-    while(ros::ok()){
-        ros::spinOnce();
-    }
+    ros::spin();
 
     ROS_INFO_STREAM("End of the program.\n");
     return -1;

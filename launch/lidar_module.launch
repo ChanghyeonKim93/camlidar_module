@@ -1,0 +1,25 @@
+<launch>
+<arg name="binning_on" default="false"/>
+    <arg name="triggered_on" default="true"/>
+    <arg name="auto_exposure_control" default="false"/>
+    <arg name="auto_gain_control" default="false"/>
+    <arg name="high_dynamic_range_on" default="true"/>
+    <arg name="expose_us" default="13000"/>
+    <arg name="frame_rate" default="40.0"/>
+
+    <group ns = "lidar0">
+      <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
+        <arg name="device_ip" value="192.168.1.101" />
+        <arg name="port" value="2367" />
+        <arg name="rpm" value="1204" />
+        <arg name="gps_time" value="true" />
+      </include>
+    </group>	
+
+    <node pkg="rosserial_python" type="serial_node.py" name="arduino_UART" args="_port:=/dev/ttyACM0 _baud:=460800" output="screen">
+    </node>
+    
+    <node pkg="camlidar_module" type="camlidar_module" name="camlidar_module" output="screen">
+    </node>
+       
+</launch>

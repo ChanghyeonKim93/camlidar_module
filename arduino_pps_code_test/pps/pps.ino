@@ -21,17 +21,8 @@
 //     PORTD &= ~(B7 | B5 | B4); // digital pin 7 5 4 LOW
 //     PORTD ^= B7 | B5 | B4; // digital pin 7 5 4 toggle
 
-#include <ros.h>
-#include <std_msgs/String.h>
-#include <camlidar_module/trg_msg.h> // custom message
 
-// node handler
-ros::NodeHandle nh;
-camlidar_module::trg_msg trgmsg;
-ros::Publisher pub_msg("/mcu/trigger", &trgmsg);
-
-
-volatile unsigned long trigger_time = 100000;
+volatile unsigned long trigger_time = 0;
 volatile unsigned long count = 0;
 volatile unsigned long unit_time_counter = 0; 
 
@@ -67,6 +58,7 @@ void setup(){
   
   pinMode(PIN_TRIGGER, OUTPUT);
   pinMode(PIN_PPS,OUTPUT);
+Serial.begin(115200);
   Serial3.begin(9600); // TX3 (D14), RX3 (D15)
   
   cli();// stop interrupts (== noInterrupts() ).
@@ -92,12 +84,6 @@ void setup(){
   TIMSK1 |= (1 << OCIE1A); 
 
   sei(); // allow interrupt
-
-  // ROS initialization
-  nh.getHardware()->setBaud(460800);
-
-  nh.initNode();
-  nh.advertise(pub_msg);
 }
 
 ISR(TIMER1_COMPA_vect){// 50 ms
@@ -105,7 +91,7 @@ ISR(TIMER1_COMPA_vect){// 50 ms
   
   // log time
   //trigger_time = micros();
-  trigger_time += 49998; // 1.925 us / 50 ms fast 
+  trigger_time = unit_time_counter*49999; // 1.925 us / 50 ms fast 
   
   // send msg
   time_sec  = trigger_time/1000000;
@@ -121,10 +107,6 @@ ISR(TIMER1_COMPA_vect){// 50 ms
     PORTB &= ~B4;
     count = 0;
     
-    // fill ros msg
-    trgmsg.status_trgs = 2;
-    trgmsg.seq_cam = ++cam_counter;
-    trgmsg.seq_pps = ++pps_counter;
 
     time_hh = time_sec / 3600;
     time_mm = time_sec / 60;
@@ -190,39 +172,25 @@ ISR(TIMER1_COMPA_vect){// 50 ms
       hhmmss_msmsms_c[9] = c[2];
     }
     
-    trgmsg.stamp.sec  = time_sec;
-    trgmsg.stamp.nsec = time_nsec;
-    pub_msg.publish(&trgmsg);
-    nh.spinOnce(); // ROS message transmission
 
     // NMEA message (GPRMC)  
-    volatile char buf[41+1];
+    volatile char buf[46];
     strcpy(buf,header_c);
     strcat(buf,hhmmss_msmsms_c);
     strcat(buf,tail_c);
 
-    byte c = stringChecksum((volatile char*)buf,41);
-    Serial3.print("$");
-    Serial3.print((const char*)buf);
-    Serial3.print("*");
+    Serial.print(time_sec);
+    Serial.print(".");
+    Serial.print(time_nsec);
+    Serial.print(" / ");
+    Serial.println((const char*)hhmmss_msmsms_c);
 
-    Serial3.println(c,HEX);
   }
   else {
     for(int i = 0; i < 300; i++){
       PORTH = B4; // PIN_PPS 
     }
     PORTH &= ~B4;
-    
-    // fill ros msg
-    trgmsg.status_trgs = 1;
-    trgmsg.seq_cam = ++cam_counter;
-    
-  
-    trgmsg.stamp.sec  = time_sec;
-    trgmsg.stamp.nsec = time_nsec;
-    pub_msg.publish(&trgmsg);
-    nh.spinOnce(); // ROS message transmission
 
   }
     
