@@ -1,0 +1,19 @@
+%YAML:1.0
+IMAGE.ROWS: 480
+IMAGE.COLS: 752
+IMAGE.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [525.0, 0.0, 320.0, 0.0, 525.0, 240.0, 0.0, 0.0, 1.0]
+IMAGE.DISTORTION: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [-0.2, 0.007, 0.00019, 1.753e-05, 0.0]
+T_CL: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: d
+   data: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+

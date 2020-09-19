@@ -13,12 +13,13 @@
 
 #include <cv_bridge/cv_bridge.h>
 
+#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "opencv2/core/eigen.hpp"
 
 #include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
 #include <image_transport/image_transport.h>
 
@@ -33,10 +34,8 @@
 
 // topic synchronizer
 #include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
 
@@ -58,17 +57,13 @@ public:
     CamLidarSyncAlign(ros::NodeHandle& nh);
     ~CamLidarSyncAlign();
 
-// private variables
 
-    // node handler
+private: // ROS related
     ros::NodeHandle nh_;
-    ros::Subscriber sub1, sub2;
-
 
      // subscribers
     message_filters::Subscriber<sensor_msgs::Image> *img_sub;
     message_filters::Subscriber<sensor_msgs::PointCloud2> *lidar_sub;
-
     message_filters::Synchronizer<MySyncPolicy> *sync_sub;
 
     // topic names
@@ -77,9 +72,11 @@ public:
 
     // data container (buffer)
     cv::Mat buf_img_; // Images from mvBlueCOUGAR-X cameras.
-    double buf_time_; // triggered time stamp from Arduino. (second)
+    cv::Mat img_undistort_; // image (undistorted)
+
+    double buf_time_; // triggered time stamp from Arduino. (seconds)
     pcl::PointCloud<pcl::PointXYZI>::Ptr buf_lidar_; // point clouds (w/ intensity) from Velodyne VLP16 
-    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr lidar_pcl_warped_; // Pointclouds (warped onto the image frame from the LiDAR frame)
     float* buf_lidar_x;
     float* buf_lidar_y;
     float* buf_lidar_z;
@@ -88,15 +85,37 @@ public:
     float* buf_lidar_time;
     int n_pts_lidar;
 
+private: // image undistorter & lidar warping.
+    cv::Mat cvK; // intrinsic matrix of the camera.
+    cv::Mat cvDistortion; // distortion parameters (five). {k1 k2 p1 p2 k3}
+    cv::Mat cvT_cl;
+
+    Eigen::Matrix3d K;
+    Eigen::Matrix4d T_cl; // SE(3) transform from a camera frame to a LiDAR frame.
+    int n_cols; // image width
+    int n_rows; // image height
+
+    cv::Mat undist_map_x; // undistortion map x (pre-calculated in 'preCalculateUndistortMaps' for speed)
+    cv::Mat undist_map_y; // undistortion map y (pre-calculated in 'preCalculateUndistortMaps' for speed)
+
+
 // private methods
-public:
+private: // ROS related
     void callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar);
-    void imgcb(const sensor_msgs::ImageConstPtr& msg_image);
-    void lidarcb(const sensor_msgs::PointCloud2ConstPtr& msg_lidar);
+
+private: // image undistortion & LiDAR warping
+    void readCameraLidarParameter(const string& path_dir);
+    void preCalculateUndistortMaps();
+    void undistortCurrentImage(const cv::Mat& img_source, cv::Mat& img_dst);
 
 };
 
-
+/*
+*
+*
+*
+*
+*/
 /* implementation */
 CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
 : nh_(nh)
@@ -118,9 +137,6 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
 
     topicname_lidar_ = "/lidar0/velodyne_points";
 
-    //sub1 = nh_.subscribe("/0/image_raw",1,&CamLidarSyncAlign::imgcb,this);
-    //sub2 = nh_.subscribe("/lidar0/velodyne_points",1,&CamLidarSyncAlign::lidarcb,this);
-
     this->img_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh_, topicname_img_, 1);
     this->lidar_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh_, topicname_lidar_, 1);
     
@@ -128,7 +144,13 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
     this->sync_sub = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10),*this->img_sub, *this->lidar_sub);
     this->sync_sub->registerCallback(boost::bind(&CamLidarSyncAlign::callbackImageLidarSync,this, _1, _2));
 
+    // Load calibration parameters
+    
+    string params_path = "/home/larrkchlaptop/catkin_ws/src/camlidar_module/params/bluefox_vlp16.yaml";
+    readCameraLidarParameter(params_path);
+    preCalculateUndistortMaps();
 };
+
 CamLidarSyncAlign::~CamLidarSyncAlign(){
     delete[] buf_lidar_x;
     delete[] buf_lidar_y;
@@ -137,12 +159,17 @@ CamLidarSyncAlign::~CamLidarSyncAlign(){
     delete[] buf_lidar_ring;
     delete[] buf_lidar_time;
 };
+
 void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar){
     // get image
     //cout << " camlidar node callback.\n";
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
     buf_img_ = cv_ptr->image;
+    
+    // undistort image
+    this->undistortCurrentImage(buf_img_, img_undistort_);
+
 
 	double time_img = (double)(msg_image->header.stamp.sec * 1e6 + msg_image->header.stamp.nsec / 1000) / 1000000.0;
     cout << "Callback time (image): " << time_img << "\n";
@@ -187,21 +214,80 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
     int n_pts = temp->points.size();
     cout <<"n_pts lidar: " <<n_pts<<endl;
 };
-void CamLidarSyncAlign::imgcb(const sensor_msgs::ImageConstPtr& msg_image){
- // get image
-    cout << " cam  callback.\n";
-    cv_bridge::CvImagePtr cv_ptr;
-    cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
-    buf_img_ = cv_ptr->image;
 
-	double time_img = (double)(msg_image->header.stamp.sec * 1e6 + msg_image->header.stamp.nsec / 1000) / 1000000.0;
-    cout << "Callback time (image): " << time_img << "\n";
-}
+void CamLidarSyncAlign::readCameraLidarParameter(const string& path_dir){
+    // Load calibration files
+    cv::FileStorage fsSettings(path_dir, cv::FileStorage::READ);
+    if (!fsSettings.isOpened())
+        cerr << "ERROR: Wrong path to settings" << endl;
+    
+    fsSettings["IMAGE.K"] >> cvK;
+    fsSettings["IMAGE.DISTORTION"] >> cvDistortion;
+    fsSettings["T_CL"] >> cvT_cl;
+    this->n_rows = fsSettings["IMAGE.ROWS"];
+    this->n_cols = fsSettings["IMAGE.COLS"];
 
-void CamLidarSyncAlign::lidarcb(const sensor_msgs::PointCloud2ConstPtr& msg_lidar){
- double time_lidar = (double)(msg_lidar->header.stamp.sec * 1e6 + msg_lidar->header.stamp.nsec / 1000) / 1000000.0;
-    cout << "Callback time (lidar): " << time_lidar << "\n";
+    cout << cvK<<endl;
+    cout << cvDistortion<<endl;
+    cout<<cvT_cl<<endl;
+    cout<<"n_rows: "<<this->n_rows<<", n_cols: "<<this->n_cols<<endl;
+    
+    fsSettings.release();
 
+    if (cvK.empty() || cvDistortion.empty() || cvT_cl.empty() || n_rows == 0 || n_cols == 0)
+        cerr << "ERROR: Calibration parameters to rectify an image are missing!" << endl;
+   
+    // Eigen version
+    cv::cv2eigen(cvT_cl, T_cl);
+    cv::cv2eigen(cvK, K);
 
-}
+    cout << "  Camera & LiDAR information is loaded... DONE!\n";
+};
+
+void CamLidarSyncAlign::preCalculateUndistortMaps(){
+    // allocation
+    undist_map_x = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
+    undist_map_y = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
+    img_undistort_ = cv::Mat::zeros(n_rows, n_cols, CV_8UC3);
+
+    // interpolation grid calculations
+    float* map_x_ptr = nullptr;
+    float* map_y_ptr = nullptr;
+    
+    float fu = K(0,0);
+    float fv = K(1,1);
+    float fuinv = 1.0f/fu;
+    float fvinv = 1.0f/fv;
+    float centeru = K(0,2);
+    float centerv = K(1,2);
+    float k1 = cvDistortion.at<double>(0,0);
+    float k2 = cvDistortion.at<double>(0,1);
+    float p1 = cvDistortion.at<double>(0,2);
+    float p2 = cvDistortion.at<double>(0,3);
+    float k3 = cvDistortion.at<double>(0,4);
+
+    for(int v = 0; v < n_rows; v++){
+        map_x_ptr = undist_map_x.ptr<float>(v);
+        map_y_ptr = undist_map_y.ptr<float>(v);
+
+        for(int u = 0; u < n_cols; u++){
+            float x = (u-centeru)*fuinv;
+            float y = (v-centerv)*fvinv;
+            float r2 = x*x + y*y;
+            float r4 = r2*r2;
+            float r6 = r2*r4;
+            float r = sqrtf(r2);
+            float r_radial = 1.0f + k1*r2 + k2*r4 + k3*r6;
+            float x_dist = x*r_radial + 2*p1*x*y + p2*(r2 + 2*x*x);
+            float y_dist = y*r_radial + p1*(r2 + 2*y*y) + 2*p2*x*y;
+            *(map_x_ptr+u) = fu*x_dist + centeru;
+            *(map_y_ptr+u) = fv*y_dist + centerv;
+        }
+    }
+};
+
+void CamLidarSyncAlign::undistortCurrentImage(const cv::Mat& img_source, cv::Mat& img_dst){
+    cv::remap(img_source, img_dst, this->undist_map_x, this->undist_map_y, CV_INTER_LINEAR);
+};
+
 #endif
