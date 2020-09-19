@@ -1,5 +1,6 @@
 <launch>
-<arg name="binning_on" default="false"/>
+    <arg name="parameter_directory" default="/home/larrkchlaptop/catkin_ws/src/camlidar_module/params/bluefox_vlp16.yaml"/>
+    <arg name="binning_on" default="false"/>
     <arg name="triggered_on" default="true"/>
     <arg name="auto_exposure_control" default="false"/>
     <arg name="auto_gain_control" default="false"/>
@@ -7,15 +8,18 @@
     <arg name="expose_us" default="13000"/>
     <arg name="frame_rate" default="40.0"/>
 
+
+
     <node pkg="bluefox" name="bluefox_multiple_camlidar_node" type="bluefox_multiple_camlidar_node" output="screen">
         <param name="binning_on" type="bool" value="$(arg binning_on)"/>
         <param name="triggered_on" type="bool" value="$(arg triggered_on)"/>
         <param name="aec_on" type="bool" value="$(arg auto_exposure_control)"/>
         <param name="agc_on" type="bool" value="$(arg auto_gain_control)"/>
         <param name="hdr_on" type="bool" value="$(arg high_dynamic_range_on)"/>
-	    <param name="expose_us" type="int" value="$(arg expose_us)"/>
+	<param name="expose_us" type="int" value="$(arg expose_us)"/>
         <param name="frame_rate" type="double" value="$(arg frame_rate)"/>
     </node>
+
     <group ns = "lidar0">
       <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
         <arg name="device_ip" value="192.168.1.101" />
@@ -27,14 +31,14 @@
 
     <node pkg="rqt_reconfigure" type="rqt_reconfigure" name="rqt_reconfigure" output="screen">
     </node>
-    
-    <node pkg="rqt_image_view" type="rqt_image_view" name="rqt_image_view" output="screen">
-    </node>
+
+    <node pkg="rviz" type="rviz" name="rviz" args=" camlidar_module/camlidar_rviz.rviz" />
 
     <node pkg="rosserial_python" type="serial_node.py" name="arduino_UART" args="_port:=/dev/ttyACM0 _baud:=460800" output="screen">
     </node>
     
     <node pkg="camlidar_module" type="camlidar_module" name="camlidar_module" output="screen">
+	<param name="parameter_directory" type="string" value="$(arg parameter_directory)"/>
     </node>
        
 </launch>

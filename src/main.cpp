@@ -26,8 +26,10 @@ const std::string currentDateTime(){
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "camlidar_module");
-ros::NodeHandle nh("~");
-    CamLidarSyncAlign* cl = new CamLidarSyncAlign(nh);
+    ros::NodeHandle nh("~");
+    string param_directory = "/home/larrkchlaptop/catkin_ws/src/camlidar_module/params/bluefox_vlp16.yaml";    
+    ros::param::get("~parameter_directory", param_directory);
+    CamLidarSyncAlign* cl = new CamLidarSyncAlign(nh,param_directory);
     
     ros::spin();
 

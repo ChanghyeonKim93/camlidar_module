@@ -54,7 +54,7 @@ inline string itos(double x) {
 
 class CamLidarSyncAlign {
 public:
-    CamLidarSyncAlign(ros::NodeHandle& nh);
+    CamLidarSyncAlign(ros::NodeHandle& nh,const string& param_path_);
     ~CamLidarSyncAlign();
 
 
@@ -117,7 +117,7 @@ private: // image undistortion & LiDAR warping
 *
 */
 /* implementation */
-CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
+CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_path_)
 : nh_(nh)
 {   
     cout << " ALGINER STARTS.\n";
@@ -145,9 +145,7 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh)
     this->sync_sub->registerCallback(boost::bind(&CamLidarSyncAlign::callbackImageLidarSync,this, _1, _2));
 
     // Load calibration parameters
-    
-    string params_path = "/home/larrkchlaptop/catkin_ws/src/camlidar_module/params/bluefox_vlp16.yaml";
-    readCameraLidarParameter(params_path);
+    readCameraLidarParameter(param_path_);
     preCalculateUndistortMaps();
 };
 
