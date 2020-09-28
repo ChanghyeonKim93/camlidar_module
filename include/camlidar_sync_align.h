@@ -54,9 +54,12 @@ inline string itos(double x) {
 
 class CamLidarSyncAlign {
 public:
-    CamLidarSyncAlign(ros::NodeHandle& nh,const string& param_path_);
+    CamLidarSyncAlign(ros::NodeHandle& nh,const string& param_path_,const string& save_path);
     ~CamLidarSyncAlign();
+    void saveLidarDataRingTime(const string& file_name);
 
+    void saveSnapshot();
+    bool getDataReady(){return this->data_ready_;};
 
 private: // ROS related
     ros::NodeHandle nh_;
@@ -84,6 +87,10 @@ private: // ROS related
     unsigned short* buf_lidar_ring;
     float* buf_lidar_time;
     int n_pts_lidar;
+
+    int current_seq_; // for snapshot saving.
+    bool data_ready_;
+    string save_dir_;
 
 private: // image undistorter & lidar warping.
     cv::Mat cvK; // intrinsic matrix of the camera.
@@ -117,8 +124,8 @@ private: // image undistortion & LiDAR warping
 *
 */
 /* implementation */
-CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_path_)
-: nh_(nh)
+CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_path_, const string& save_path)
+: nh_(nh), save_dir_(save_path)
 {   
     cout << " ALGINER STARTS.\n";
 
@@ -147,6 +154,38 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_pa
     // Load calibration parameters
     readCameraLidarParameter(param_path_);
     preCalculateUndistortMaps();
+
+    // snapshot parameters
+    current_seq_ = 0;
+    data_ready_ = false;
+
+    // generate save folder
+    std::string folder_create_command;
+    folder_create_command = "sudo rm -rf " + save_dir_;
+	system(folder_create_command.c_str());
+    folder_create_command = "mkdir " + save_dir_;
+	system(folder_create_command.c_str());
+
+    // make image saving directories
+    folder_create_command = "mkdir " + save_dir_ + "cam0/";
+	system(folder_create_command.c_str());
+
+    // make lidar data saving directories
+    folder_create_command = "mkdir " + save_dir_ + "lidar0/";
+	system(folder_create_command.c_str());
+
+    // save association
+    string file_name = save_dir_ + "/association.txt";
+    std::ofstream output_file(file_name, std::ios::trunc);
+    output_file.precision(6);
+    output_file.setf(std::ios_base::fixed, std::ios_base::floatfield);
+    if(output_file.is_open()){
+        output_file << "time_us ";
+        output_file << "cam0 ";
+        output_file << "exposure_us gain_dB ";
+        output_file << "lidar0 ";
+        output_file << "\n";
+    }
 };
 
 CamLidarSyncAlign::~CamLidarSyncAlign(){
@@ -164,15 +203,15 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(msg_image, sensor_msgs::image_encodings::BGR8);
     buf_img_ = cv_ptr->image;
-    
+
     // undistort image
     this->undistortCurrentImage(buf_img_, img_undistort_);
 
-
 	double time_img = (double)(msg_image->header.stamp.sec * 1e6 + msg_image->header.stamp.nsec / 1000) / 1000000.0;
-    cout << "Callback time (image): " << time_img << "\n";
     double time_lidar = (double)(msg_lidar->header.stamp.sec * 1e6 + msg_lidar->header.stamp.nsec / 1000) / 1000000.0;
-    cout << "Callback time (lidar): " << time_lidar << "\n";
+
+
+    buf_time_ = time_img;
 
     // get width and height of 2D point cloud data
     for(int i = 0; i < msg_lidar->width; i++) {
@@ -210,7 +249,13 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
     pcl::fromROSMsg(output, *temp);
 
     int n_pts = temp->points.size();
-    cout <<"n_pts lidar: " <<n_pts<<endl;
+
+
+    //cout << "Callback time (image): " << time_img << "\n";
+    //cout << "Callback time (lidar): " << time_lidar << "\n";
+    //cout <<"n_pts lidar: " <<n_pts<<endl;
+    
+    data_ready_ = true;
 };
 
 void CamLidarSyncAlign::readCameraLidarParameter(const string& path_dir){
@@ -286,6 +331,67 @@ void CamLidarSyncAlign::preCalculateUndistortMaps(){
 
 void CamLidarSyncAlign::undistortCurrentImage(const cv::Mat& img_source, cv::Mat& img_dst){
     cv::remap(img_source, img_dst, this->undist_map_x, this->undist_map_y, CV_INTER_LINEAR);
+};
+
+void CamLidarSyncAlign::saveLidarDataRingTime(const string& file_name){
+    int n_pts = n_pts_lidar;
+
+    std::ofstream output_file(file_name, std::ios::trunc);
+    output_file.precision(6);
+    output_file.setf(std::ios_base::fixed, std::ios_base::floatfield);
+
+    if(output_file.is_open()){
+        output_file << "# .PCD v.7 - Point Cloud Data file format\n";
+        output_file << "VERSION .7\n";
+        output_file << "FIELDS x y z intensity ring time\n";
+        output_file << "SIZE 4 4 4 4 2 4\n";
+        output_file << "TYPE F F F F U F\n";
+        output_file << "COUNT 1 1 1 1 1 1\n";
+        output_file << "WIDTH " << n_pts << "\n";
+        output_file << "HEIGHT 1\n";
+        output_file << "VIEWPOINT 0 0 0 1 0 0 0\n";
+        output_file << "POINTS " << n_pts<< "\n";
+        output_file << "DATA ascii\n";
+        for(int i = 0; i < n_pts; i++){
+            output_file << *(buf_lidar_x + i)<<" ";
+            output_file << *(buf_lidar_y + i)<<" ";
+            output_file << *(buf_lidar_z + i)<<" ";
+            output_file << *(buf_lidar_intensity + i)<<" ";
+            output_file << *(buf_lidar_ring + i)<<" ";
+            output_file << *(buf_lidar_time + i)<<"\n";
+        }
+    }  
+};
+
+void CamLidarSyncAlign::saveSnapshot(){
+    // save images
+    bool static png_param_on = false;
+	vector<int> static png_parameters;
+	if (png_param_on == false)
+	{
+		png_parameters.push_back(CV_IMWRITE_PNG_COMPRESSION); // We save with no compression for faster processing
+		png_parameters.push_back(0);
+		png_param_on = true;
+	}
+    ++current_seq_;
+    string file_name = save_dir_ + "/cam0/" + itos(current_seq_) + ".png";
+	cv::imwrite(file_name, buf_img_, png_parameters);
+
+    // save lidars
+    file_name = save_dir_ + "/lidar0/" + itos(current_seq_) + ".pcd";
+    saveLidarDataRingTime(file_name);
+
+    // save association
+    file_name = save_dir_ + "/association.txt";
+    std::ofstream output_file(file_name, std::ios::app);
+    output_file.precision(6);
+    output_file.setf(std::ios_base::fixed, std::ios_base::floatfield);
+    if(output_file.is_open()){
+        output_file << buf_time_ << " ";
+        output_file << "/cam0/" << current_seq_ << ".png ";
+        output_file << "/lidar0/" << current_seq_ << ".pcd ";
+        output_file << "\n";
+    }
 };
 
 #endif
