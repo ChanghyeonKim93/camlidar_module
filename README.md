@@ -1,4 +1,11 @@
 # Camera and LiDAR module (triggered)
+### 0. Functionalities of this 'camlidar_module' ROS project
+* Two sensor topics (camera and LiDAR pcl) are time-synchronized by the Arduino Mega2560 hardware. Arduino Mega2560 fires two trigger signals: (1) 20 Hz digital trigger signals (5V high) with 300 us width for 'camera trigger', (2) 1 Hz PPS signal for Velodyne interface box. (3) Arduino Mega2560 also generates a simulated NMEA ($GPRMC) message carrying via the Serial1 port (TX1 pin). This NMEA message carries timestamp (which is firing time of PPS signal measured by Arduino clock) as a form of 'hhmmss.sss' (upto milliseconds resolution).
+* Subscribes sensor_msgs::Image ( /0/image_raw ) and pcl::PointCloud2 (/lidar0/velodyne_points ) in function 'callbackImageLidarSync()'
+* undistorts RGB image by using calibration parameters from the '*.yaml' file in function 'undistortCurrentImage()' <-- this function is executed in the 'callbackImageLidarSync()'
+* saves snapshots from streaming 
+* TODO: warp LiDAR 3D points and 
+
 ### 1. How to install?
 ```
  cd ~/catkin_ws/src
@@ -68,3 +75,6 @@ dialout 이라는 글자가 안보이면 그 그룹에 안들어가있는것.
 ```
  roslaunch camlidar_module camlidar_sync.launch
 ```
+
+### 4. How to integrate this module into your ROS code
+* In 'main.cpp' 
