@@ -1,17 +1,27 @@
 # Camera and LiDAR module (triggered)
-## How to install?
-* First, download 'bluefox_ros' repository
-
-* camera driver
- 센서 하드웨어의 camera는 독일 matrixvision (baluff) 사의 mvBlueCOUGAR-X-104i 제품을 사용한다 (grayscale). 해당 제품은 산업용 이미지솔루션의 통신 표준으로 자리잡은 GigE (이미지 전송용 LAN 통신 protocol) 을 이용하며, 사용하기 위해서는 독립적인 library를 설치해주어야 한다.
- 본 문서와 같은 폴더의 ‘tools’ 폴더의 ‘matrixvision.zip’ 압축을 풀고, 압축이 풀린 경로로 가서 라이브러리 설치를 위해 아래 명령을 순차적으로 실행한다.
+### 1. How to install?
+```
+ cd ~/catkin_ws/src
+ git clone https://github.com/ChanghyeonKim93/camlidar_module.git 
+```
+#### 1.1. Prerequisites before building this 'camlidar_module' repository
+##### [1] 'ChanghyeonKim93/bluefox_ros'
+In your 'catkin_ws/src',
+```
+ git clone https://github.com/ChanghyeonKim93/bluefox_ros.git 
+```
+##### [2] 'rosserial*' (all rosserial libraries)
+```
+ sudo apt-get install ros-{DISTRO}-rosserial*
+```
+##### [3] Matrix Vision mvBLueFOX2-MLC camera driver (Installation files are included in 'camera_drivers' folder in this repository)
+ 센서 하드웨어의 camera는 독일 matrixvision (baluff) 사의 mvBlueFOX2-MLC200wC 제품을 사용한다 (color). 사용하기 위해서는 독립적인 library를 설치해주어야 한다. 본 문서와 같은 폴더의 ‘tools’ 폴더의 ‘matrixvision.zip’ 압축을 풀고, 압축이 풀린 경로로 가서 라이브러리 설치를 위해 아래 명령을 순차적으로 실행한다.
  ```
    sudo chmod +x install_mvGenTL_Acquire.sh 
    sudo ./install_mvGenTL_Acquire.sh 
 ```
  설치 시, 모두 yes를 입력하여 설치를 완료한다. 조금 걸린다. 
- 설치 완료 후, 재부팅을 해준다. 재부팅 시에 library가 설치되어있는 경로에 대한 환경변수가 설정 되는 것으로 보인다.
- blueFOX-MLC 카메라의 경우, GenTL을 쓰지않고 hardware specified library를 쓴다. 따라서bluefox 카메라 사용할 때에는 전용 드라이버도 함께 설치해주자. 설치 방법은 거의 동일하다!
+ blueFOX-MLC 카메라의 경우, GenTL을 쓰지않고 hardware specified library를 쓴다. 따라서 blueFOX 카메라 사용할 때에는 전용 드라이버도 함께 설치해주자. 설치 방법은 거의 동일하다!
 
 * libusb 접근 권한 부여 (for blueFOX camera only)
 
@@ -26,12 +36,14 @@ command 에서
 dialout 이라는 글자가 안보이면 그 그룹에 안들어가있는것.
 >> sudo usermod -a -G dialout <username> 
 으로 권한을 주고, 꼭 REBOOT을 해야지 권한이 주어진다.
+ 
+ 설치 완료 후, 재부팅을 해준다. 재부팅 시에 library가 설치되어있는 경로에 대한 환경변수가 설정 되는 것으로 보인다.
 
-## LiDAR driver**
- velodyne lidar의 데이터를 ROS topic으로 출력하는 rospackage를 설치해야한다. 아래 주소에서 설치 방법이 상세하게 설명되어있다.
+##### [4] Velodyne LiDAR driver
+ velodyne lidar의 데이터를 ROS topic으로 출력하는 ROS package를 설치해야한다. 아래 주소에서 설치 방법이 상세하게 설명되어있으며, 해당 내용을 그대로 따라서 설치하면 된다.
 (http://wiki.ros.org/velodyne/Tutorials/Getting%20Started%20with%20the%20Velodyne%20VLP16)
  설치 후, 실행이 되는지 확인해보자. 단, 본 lidar+camera 하드웨어 세팅에서는 lidar 의 IP를 static IP로 설정해주었기 때문에, roscd velodyne_pointcloud 에서 /launch 폴더 내 VLP16_points.launch 파일을 수정해야 사용 할 수 있다. 
- 연구실 내 각 LiDAR에는 고정 IP와 port 번호를 부여 해두었다.
+ 연구실 내 각 LiDAR에는 고정 IP와 port 번호 규칙을 정하였다. (roscore가 구동되는 laptop ip: 192.168.1.1)
 ```
   lidar0: 192.168.1.101 (port 2357)
  	lidar1: 192.168.1.201 (port 2358)
@@ -44,4 +56,15 @@ dialout 이라는 글자가 안보이면 그 그룹에 안들어가있는것.
  이후, 아래 명령을 실행하여 rviz를 통해 pointcloud2 토픽이 잘 나오는지 확인해본다.
 ```
    roslaunch velodyne_pointcloud VLP16_points.launch
+```
+
+### 2. Build
+``` 
+ cd ~/catkin_ws
+ catkin_make
+```
+
+### 3. Run
+```
+ roslaunch camlidar_module camlidar_sync.launch
 ```
