@@ -31,7 +31,7 @@
       <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
         <arg name="device_ip" value="192.168.1.101" />
         <arg name="port" value="2367" />
-        <arg name="rpm" value="1204" />
+        <arg name="rpm" value="1200" />
         <arg name="gps_time" value="true" />
       </include>
     </group>	
@@ -42,7 +42,7 @@
     </node>
     
     <node pkg="camlidar_module" type="camlidar_module" name="camlidar_module" output="screen">
-	    <param name="parameter_directory" type="string" value="$(arg parameter_directory)"/>
+      <param name="parameter_directory" type="string" value="$(arg parameter_directory)"/>
       <param name="snapshot_saving_onoff" type="bool" value="$(arg snapshot_saving_onoff)"/>
       <param name="save_directory" type="string" value="$(arg save_directory)"/>
     </node>

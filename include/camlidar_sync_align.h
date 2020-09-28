@@ -54,6 +54,8 @@ inline string itos(double x) {
 
 class CamLidarSyncAlign {
 public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+public:
     CamLidarSyncAlign(ros::NodeHandle& nh,const string& param_path_,const string& save_path);
     ~CamLidarSyncAlign();
     void saveLidarDataRingTime(const string& file_name);
@@ -237,6 +239,7 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
        memcpy(buf_lidar_ring+i, &msg_lidar->data[ind_ring], sizeof(unsigned short));
        memcpy(buf_lidar_time+i, &msg_lidar->data[ind_time], sizeof(float));
     }
+    n_pts_lidar = msg_lidar->width; // # of lidar points in one circle
 
     // Create a container for the data.
     sensor_msgs::PointCloud2 output;

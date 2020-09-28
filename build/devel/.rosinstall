@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/larrkchlaptop/catkin_ws/src/camlidar_module/build/devel/setup.sh
