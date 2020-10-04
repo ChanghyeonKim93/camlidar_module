@@ -77,7 +77,8 @@ private: // ROS related
 
     // data container (buffer)
     cv::Mat buf_img_; // Images from mvBlueCOUGAR-X cameras.
-    cv::Mat img_undistort_; // image (undistorted)
+    cv::Mat img_undistort_; // image (undistorted, CV_32F (float))
+    cv::Mat img_index_; // (CV_16S, -32768~32767) index image (having same size with img_undistort_) storing indexes of warped LiDAR points.
 
     double buf_time_; // triggered time stamp from Arduino. (seconds)
     pcl::PointCloud<pcl::PointXYZI>::Ptr buf_lidar_; // point clouds (w/ intensity) from Velodyne VLP16 
@@ -85,10 +86,20 @@ private: // ROS related
     float* buf_lidar_x;
     float* buf_lidar_y;
     float* buf_lidar_z;
+    
+    float* buf_lidar_x_warped;
+    float* buf_lidar_y_warped;
+    float* buf_lidar_z_warped;
+
+    float* buf_lidar_u_projected;
+    float* buf_lidar_v_projected;
+    
     float* buf_lidar_intensity;
     unsigned short* buf_lidar_ring;
     float* buf_lidar_time;
+
     int n_pts_lidar;
+    int n_pts_lidar_warped; // n_pts_lidar_warped < n_pts_lidar
 
     int current_seq_; // for snapshot saving.
     bool data_ready_;
@@ -108,6 +119,10 @@ private: // image undistorter & lidar warping.
     cv::Mat undist_map_y; // undistortion map y (pre-calculated in 'preCalculateUndistortMaps' for speed)
 
 
+    // for debug image
+    bool flag_debugimage_;
+    string winname_;
+
 // private methods
 private: // ROS related
     void callbackImageLidarSync(const sensor_msgs::ImageConstPtr& msg_image, const sensor_msgs::PointCloud2ConstPtr& msg_lidar);
@@ -116,6 +131,11 @@ private: // image undistortion & LiDAR warping
     void readCameraLidarParameter(const string& path_dir);
     void preCalculateUndistortMaps();
     void undistortCurrentImage(const cv::Mat& img_source, cv::Mat& img_dst);
+    void warpAndProjectLidarPointcloud(); // This function generates "depth image" and "warped lidar pointcloud (R^{3 x N})" 
+
+
+    // What you can use: "IN THE CALLBACK function"
+    // buf_lidar_x_warped, buf_lidar_y_warped, buf_lidar_z_warped, img_undistort_,img_index_;
 
 };
 
@@ -139,6 +159,14 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_pa
 	buf_lidar_x = new float[100000];
 	buf_lidar_y = new float[100000];
 	buf_lidar_z = new float[100000];
+
+    buf_lidar_x_warped = new float[100000];
+	buf_lidar_y_warped = new float[100000];
+	buf_lidar_z_warped = new float[100000];
+
+    buf_lidar_u_projected = new float[100000];
+    buf_lidar_v_projected = new float[100000];
+
 	buf_lidar_intensity = new float[100000];
 	buf_lidar_ring = new unsigned short[100000];
 	buf_lidar_time = new float[100000];
@@ -188,12 +216,30 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_pa
         output_file << "lidar0 ";
         output_file << "\n";
     }
+
+    // debug image on/off
+    flag_debugimage_ = true;
+    if(flag_debugimage_){
+        winname_ = "undistorted image";
+        cv::namedWindow(winname_,CV_WINDOW_AUTOSIZE);
+    }
+
+    // index image
+    img_index_ = cv::Mat::zeros(n_rows, n_cols, CV_16S);
 };
 
 CamLidarSyncAlign::~CamLidarSyncAlign(){
     delete[] buf_lidar_x;
     delete[] buf_lidar_y;
     delete[] buf_lidar_z;
+
+    delete[] buf_lidar_x_warped;
+    delete[] buf_lidar_y_warped;
+    delete[] buf_lidar_z_warped;
+
+    delete[] buf_lidar_u_projected;
+    delete[] buf_lidar_v_projected;
+
     delete[] buf_lidar_intensity;
     delete[] buf_lidar_ring;
     delete[] buf_lidar_time;
@@ -208,6 +254,7 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
 
     // undistort image
     this->undistortCurrentImage(buf_img_, img_undistort_);
+
 
 	double time_img = (double)(msg_image->header.stamp.sec * 1e6 + msg_image->header.stamp.nsec / 1000) / 1000000.0;
     double time_lidar = (double)(msg_lidar->header.stamp.sec * 1e6 + msg_lidar->header.stamp.nsec / 1000) / 1000000.0;
@@ -241,11 +288,30 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
     }
     n_pts_lidar = msg_lidar->width; // # of lidar points in one circle
 
-    // Create a container for the data.
+    // warp and project lidar points
+    warpAndProjectLidarPointcloud();
+
+    
+    if(flag_debugimage_){
+	    cv::Scalar orange(0, 165, 255), blue(255, 0, 0), magenta(255, 0, 255);
+
+        cv::Mat img_8u;
+        img_undistort_.convertTo(img_8u, CV_8UC3);
+        cout << "n_pts_warped: "<<n_pts_lidar_warped<<"\n";
+        for(int i = 0; i < n_pts_lidar_warped; i++){
+	        cv::Point pt(buf_lidar_u_projected[i], buf_lidar_v_projected[i]);
+	        cv::circle(img_8u, pt, 1, magenta);
+        }
+        cv::imshow(winname_, img_index_);
+        cv::waitKey(10);
+    }
+
+    // Create a container for the output lidar data.
     sensor_msgs::PointCloud2 output;
 
     // Do data processing here...
     output = *msg_lidar;
+
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr temp = buf_lidar_;
     temp->clear();
@@ -292,9 +358,10 @@ void CamLidarSyncAlign::readCameraLidarParameter(const string& path_dir){
 
 void CamLidarSyncAlign::preCalculateUndistortMaps(){
     // allocation
-    undist_map_x = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
-    undist_map_y = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
+    undist_map_x   = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
+    undist_map_y   = cv::Mat::zeros(n_rows, n_cols, CV_32FC1);
     img_undistort_ = cv::Mat::zeros(n_rows, n_cols, CV_8UC3);
+
 
     // interpolation grid calculations
     float* map_x_ptr = nullptr;
@@ -394,6 +461,45 @@ void CamLidarSyncAlign::saveSnapshot(){
         output_file << "/cam0/" << current_seq_ << ".png ";
         output_file << "/lidar0/" << current_seq_ << ".pcd ";
         output_file << "\n";
+    }
+};
+
+void CamLidarSyncAlign::warpAndProjectLidarPointcloud(){
+     n_pts_lidar_warped = 0;
+
+    float y_min = 0.0; 
+    float y_max = 20.0;
+
+    // fill img_index_ with -1;
+    img_index_ = -1;
+
+    // warp point via T_cl
+    Eigen::Vector3d X, X_warped, X_projected;
+    for (int i = 0; i < n_pts_lidar; i++){
+        X(0) = buf_lidar_x[i];
+        X(1) = buf_lidar_y[i];
+        X(2) = buf_lidar_z[i];
+        X_warped = T_cl.block<3,3>(0,0)*X + T_cl.block<3,1>(0,3);
+        buf_lidar_x_warped[i] = X_warped(0);
+        buf_lidar_y_warped[i] = X_warped(1);
+        buf_lidar_z_warped[i] = X_warped(2);
+
+        // projection
+        X_projected(0) = X_warped(0)/X_warped(2)*K(0,0)+K(0,2);
+        X_projected(1) = X_warped(1)/X_warped(2)*K(1,1)+K(1,2);
+        if(X(1) > y_min & X(1) < y_max & X_projected(0) > 0 & X_projected(0) < n_cols & X_projected(1) > 0 & X_projected(1) < n_rows){
+            buf_lidar_u_projected[n_pts_lidar_warped] = X_projected(0);
+            buf_lidar_v_projected[n_pts_lidar_warped] = X_projected(1);
+            ++n_pts_lidar_warped;
+
+            // fill "img_index_"
+            short* ptr_temp = img_index_.ptr<short>(0);
+            short u,v;
+            u = (short)X_projected(0);
+            v = (short)X_projected(1);
+            *(ptr_temp + n_cols*v + u) = i;
+            
+        }
     }
 };
 

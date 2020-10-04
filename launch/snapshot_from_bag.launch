@@ -1,0 +1,24 @@
+<launch>
+    <arg name="parameter_directory" default="/home/larrkchlaptop/catkin_ws/src/camlidar_module/params/bluefox_vlp16_BS.yaml"/>
+    <arg name="save_directory" default="/home/larrkchlaptop/camlidar_data/"/>
+
+    <arg name="snapshot_saving_onoff" default="true"/>
+
+    <arg name="binning_on" default="false"/>
+    <arg name="software_binning_on" default="true"/>
+    <arg name="software_binning_level" default="1"/>
+    <arg name="triggered_on" default="true"/>
+    <arg name="auto_exposure_control" default="false"/>
+    <arg name="auto_gain_control" default="false"/>
+    <arg name="high_dynamic_range_on" default="true"/>
+    <arg name="expose_us" default="15000"/>
+    <arg name="frame_rate" default="20.0"/>
+    <node pkg="rviz" type="rviz" name="rviz" args=" camlidar_module/camlidar_rviz.rviz" />
+
+    <node pkg="camlidar_module" type="camlidar_module" name="camlidar_module" output="screen">
+      <param name="parameter_directory" type="string" value="$(arg parameter_directory)"/>
+      <param name="snapshot_saving_onoff" type="bool" value="$(arg snapshot_saving_onoff)"/>
+      <param name="save_directory" type="string" value="$(arg save_directory)"/>
+    </node>
+       
+</launch>
