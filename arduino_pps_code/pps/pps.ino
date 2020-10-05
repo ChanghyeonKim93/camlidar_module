@@ -75,7 +75,8 @@ void setup(){
   TCCR1B = 0; // same for B
   TCNT1 = 0;
 
-  OCR1A = 12522-1; // 12500 * 4 us/cnt = 200000 us per compare!// MEGA 12521 -1 : 
+  //OCR1A = 12522-1; // 12500 * 4 us/cnt = 200000 us per compare!// MEGA 12521 -1 : 
+  OCR1A = 25044-1; // 25000 * 4 us/cnt = 400000 us per compare (
   
   // turn on CTC mode
   TCCR1B |= (1 << WGM12); // CTC mode.

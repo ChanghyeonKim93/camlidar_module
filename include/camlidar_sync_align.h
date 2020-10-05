@@ -219,7 +219,7 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_pa
 
     // debug image on/off
     flag_debugimage_ = true;
-    ros::param::get("~flag_debugimage", flag_debugimage_);
+    //ros::param::get("~flag_debugimage", flag_debugimage_);
 
     if(flag_debugimage_){
         winname_ = "undistorted image";
