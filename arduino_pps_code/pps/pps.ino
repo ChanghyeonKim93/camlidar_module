@@ -104,15 +104,16 @@ ISR(TIMER1_COMPA_vect){// 50 ms
   ++count;
   
   // log time
-  //trigger_time = micros();
-  trigger_time += 49998; // 1.925 us / 50 ms fast 
-  
+  //trigger_time += 49998; // 1.925 us / 50 ms fast 
+  trigger_time += 99996; // 3.850 us / 100 ms fast 
+
   // send msg
   time_sec  = trigger_time/1000000;
   time_nsec = (trigger_time - time_sec*1000000)*1000; 
   
   
-  if(count > 19) {
+  // if(count > 19){ 
+  if(count > 9) {
     for(int i = 0; i < 300; i++){
       PORTH = B4; // PIN_PPS 
       PORTB = B4;

@@ -3,6 +3,7 @@
     <arg name="save_directory" default="/home/larrkchlaptop/camlidar_data/"/>
 
     <arg name="snapshot_saving_onoff" default="true"/>
+    <arg name="flag_debugimage" default="true"/>
 
     <arg name="binning_on" default="false"/>
     <arg name="software_binning_on" default="true"/>
@@ -31,7 +32,7 @@
       <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
         <arg name="device_ip" value="192.168.1.101" />
         <arg name="port" value="2367" />
-        <arg name="rpm" value="1200" />
+        <arg name="rpm" value="600" />
         <arg name="gps_time" value="true" />
       </include>
     </group>	
@@ -45,6 +46,7 @@
       <param name="parameter_directory" type="string" value="$(arg parameter_directory)"/>
       <param name="snapshot_saving_onoff" type="bool" value="$(arg snapshot_saving_onoff)"/>
       <param name="save_directory" type="string" value="$(arg save_directory)"/>
+      <param name="flag_debugimage" type="bool" value="$(arg flag_debugimage)"/>
     </node>
        
 </launch>

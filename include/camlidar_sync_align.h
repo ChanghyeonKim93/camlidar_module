@@ -219,6 +219,8 @@ CamLidarSyncAlign::CamLidarSyncAlign(ros::NodeHandle& nh, const string& param_pa
 
     // debug image on/off
     flag_debugimage_ = true;
+    ros::param::get("~flag_debugimage", flag_debugimage_);
+
     if(flag_debugimage_){
         winname_ = "undistorted image";
         cv::namedWindow(winname_,CV_WINDOW_AUTOSIZE);
@@ -302,7 +304,7 @@ void CamLidarSyncAlign::callbackImageLidarSync(const sensor_msgs::ImageConstPtr&
 	        cv::Point pt(buf_lidar_u_projected[i], buf_lidar_v_projected[i]);
 	        cv::circle(img_8u, pt, 1, magenta);
         }
-        cv::imshow(winname_, img_index_);
+        cv::imshow(winname_, img_8u);
         cv::waitKey(10);
     }
 
